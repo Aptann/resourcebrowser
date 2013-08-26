@@ -1,4 +1,4 @@
-resourcebrowser2
+resourcebrowser
 ================
 
-Resource Browser 2
+Resource Browser

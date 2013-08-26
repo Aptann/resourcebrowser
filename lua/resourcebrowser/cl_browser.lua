@@ -288,17 +288,12 @@ local function populateTree(path, node, isRoot)
 		if v == "/" then
 			continue end
 
-		if containsInvalidCharacters(v) then
-			if isRoot then
-				totalDirectories = totalDirectories - 1
-			end
-
-			continue
-		end
-
 		if isRoot then
 			directoriesDone = directoriesDone + 1 end
 		resourceBrowser.setStatusProgress(directoriesDone / totalDirectories)
+
+		if containsInvalidCharacters(v) then continue end
+				
 
 		local node = node:AddNode(v)
 

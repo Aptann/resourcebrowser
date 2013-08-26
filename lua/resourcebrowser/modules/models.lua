@@ -5,31 +5,31 @@ MODULE.fileTypes = { "mdl" }
 
 function MODULE:SpawnUI( fileName, filePath )
 
-	local Size = math.Clamp( ( ScrH() * 0.75 ), 700, math.huge )
-
 	self.frame = vgui.Create( "DFrame" )
-	self.frame:SetSize( Size * 0.8, Size )
+	self.frame:SetSize( ScrW() * 0.8, ScrH() * 0.8 )
 	self.frame:SetTitle( "Model Viewer - " .. fileName )
 
-	local sky = Material( "models/props_lab/door_klab01" )
+	local sky = Material( "models/wireframe" )
 
 	--I'm creating it this way because it gives us more access
-	local mdl = ents.CreateClientProp( fileName )
+	util.PrecacheModel( fileName )
+	local mdl = ClientsideModel( fileName, RENDERGROUP_BOTH )
 	mdl:SetNoDraw( true )
 
 	--Widget
+	util.PrecacheModel( "models/maxofs2d/cube_tool.mdl" )
 	local widget = ents.CreateClientProp( "models/maxofs2d/cube_tool.mdl" )
 	widget:SetNoDraw( true )
 
 	local model = vgui.Create( "DPanel", self.frame )
 	local tools = vgui.Create( "DPanel", self.frame )
-	local div = vgui.Create( "DVerticalDivider", self.frame )
-	div:SetTop( model )
-	div:SetBottom( tools )
+	local div = vgui.Create( "DHorizontalDivider", self.frame )
+	div:SetLeft( model )
+	div:SetRight( tools )
 	div:Dock( FILL )
-	div:SetTopHeight( ( self.frame:GetTall() / 3 ) * 2 )
-	model:Dock( TOP )
-	model.pos = Vector( 1024, 0, mdl:OBBMins().z )
+	div:SetLeftWidth( ( self.frame:GetWide() / 4 ) * 3 )
+	model:Dock( LEFT )
+	model.pos = mdl:GetPos() + mdl:OBBCenter()
 	model.ang = Vector( -1, 0, 0 ):Angle()
 	model.moving = false
 	model.binds = {}
@@ -37,13 +37,36 @@ function MODULE:SpawnUI( fileName, filePath )
 	model.binds.left = _G[ "KEY_"..string.upper( input.LookupBinding( "+moveleft" ) ) ]
 	model.binds.right = _G[ "KEY_"..string.upper( input.LookupBinding( "+moveright" ) ) ]
 	model.binds.back = _G[ "KEY_"..string.upper( input.LookupBinding( "+back" ) ) ]
-	PrintTable( model.binds )
-	tools:Dock( BOTTOM )
+	tools:Dock( RIGHT )
+	local options = vgui.Create( "DProperties", tools )
+	options:Dock( FILL )
+
+	local wireframe = options:CreateRow( "Model Viewer Options", "Wireframe" )
+	wireframe:Setup( "boolean" )
+	wireframe:SetValue( false )
+	local cam_loc = options:CreateRow( "Model Viewer Options", "Camera Location" )
+	cam_loc:Setup( "vector" )
+	cam_loc:SetValue( model.pos )
+	local cam_ang = options:CreateRow( "Model Viewer Options", "Camera Angle" )
+	cam_ang:Setup( "angle" )
+	cam_ang:SetValue( model.ang )
+	local ground = options:CreateRow( "Model Viewer Options", "Ground Enable" )
+	ground:Setup( "angle" )
+	ground:SetValue( true )
+	local ground_size = options:CreateRow( "Model Viewer Options", "Ground Scale" )
+	ground_size:Setup( "integer" )
+	ground_size:SetValue( 256 )
+	local ground_base = options:CreateRow( "Model Viewer Options", "Set ground at base" )
+	ground_base:Setup( "boolean" )
+	ground_base:SetValue( false )
 
 	model.Paint = function ( pnl )
 
 		local x, y = pnl:LocalToScreen( 0, 0 )
 		local w, h = pnl:GetSize()
+
+		surface.SetDrawColor( 0, 0, 0, 200 )
+		surface.DrawRect( 0, 0, w, h )
 
 		--Updating movement
 		if ( pnl.moving ) then
@@ -74,9 +97,8 @@ function MODULE:SpawnUI( fileName, filePath )
 			cam.IgnoreZ( false )
 			render.SuppressEngineLighting( true )
 
-			--Drawing Skybox
 			render.SetMaterial( sky )
-			render.DrawQuadEasy( Vector( 0, 0, mdl:OBBMins().z ), Vector( 0, 0, 1 ), 256, 256, Color( 255, 255, 255, 255 ), 0 )
+			render.DrawQuadEasy( Vector( 0, 0, 0 ), Vector( 0, 0, 1 ), 256, 256, Color( 255, 255, 255, 255 ), 0 )
 
 			--Drawing Starts
 			mdl:SetNoDraw( false )
@@ -88,7 +110,7 @@ function MODULE:SpawnUI( fileName, filePath )
 
 		cam.End3D()
 
-		cam.Start3D( ( ang:Forward() * -64 ), ang, 40, x, y, h/6, h/6, 32, 128 )
+		cam.Start3D( ( ang:Forward() * -128 ), ang, 15, x, y, h/6, h/6, 64, 256 )
 
 			cam.IgnoreZ( false )
 			render.SuppressEngineLighting( true )

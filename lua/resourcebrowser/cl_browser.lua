@@ -80,6 +80,21 @@ function initBrowser()
 		resourceBrowser.browsePath(textPath:GetText())
 	end
 
+	local refreshPanel = vgui.Create("DPanel", topPanel)
+	refreshPanel:SetWidth(32)
+	refreshPanel:Dock(RIGHT)
+	refreshPanel:SetDrawBackground(false)
+	refreshPanel:DockPadding(4,4,4,4)
+	print(refreshPanel:GetTall())
+
+	local refreshButton = vgui.Create("DImageButton", refreshPanel)
+	refreshButton:SetSize(16,16)
+	refreshButton:SetPos(8,5)
+	refreshButton:SetImage("icon16/arrow_refresh.png")
+	refreshButton.DoClick = function(self)
+		resourceBrowser.refreshDirectoryTree()
+	end
+
 
 	local bottomPanel = vgui.Create("DPanel", frame)
 	bottomPanel:Dock(BOTTOM)
@@ -132,8 +147,8 @@ function initBrowser()
 		cmenu:AddSpacer()
 		cmenu:AddOption("Refresh", function() resourceBrowser.refreshFiles() end)
 		cmenu:AddSpacer()
-		cmenu:AddOption("Copy path to clipboard", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), false) end)
-		cmenu:AddOption("Copy path without root and extension", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), true) end)
+		cmenu:AddOption("Copy path", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), false) end)
+		cmenu:AddOption("Copy trimmed", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), true) end)
 		cmenu:AddSpacer()
 		cmenu:AddOption("Delete", function() resourceBrowser.deleteFile(resourceBrowser.path .. "/" .. line:GetColumnText(1)) end)
 
@@ -155,6 +170,7 @@ function initBrowser()
 	resourceBrowser.statusLabel = statusLabel
 	resourceBrowser.statusProgressBar = statusProgressBar
 	resourceBrowser.textPath = textPath
+	resourceBrowser.refreshButton = refreshButton
 
 	resourceBrowser.initialized = false
 	resourceBrowser.path = nil
@@ -215,8 +231,10 @@ end
 
 function resourceBrowser.copyPathToClipboard(filePath, trim)
 	if trim then
-		filePath = string.sub(filePath, string.find(filePath, "/") + 1, string.len(filePath))
-		// filePath = string.Replace(filePath, string.GetExtensionFromFilename(string.GetFileFromFilename(filePath)), "")
+		local rootStart, rootEnd = string.find(filePath, "^[^/]+/")
+		filePath = string.sub(filePath, rootEnd + 1, string.len(filePath))
+		local extStart, extEnd = string.find(test, "([^%.]+)$")
+		filePath = string.sub(filePath, 1, extStart - 2)
 	end
 
 	SetClipboardText(filePath)
@@ -224,6 +242,68 @@ end
 
 function resourceBrowser.refreshFiles()
 	error("Not implemented")
+end
+
+local timeResumed = 0
+local totalDirectories = 0
+local directoriesDone = 0
+
+local function populateTree(path, node, isRoot)
+	local searchPath = path .. "/*"
+	if path == "" then
+		searchPath = "*" end
+
+	local files, directories = file.Find(searchPath, "GAME", "namedesc")
+	if isRoot then
+		totalDirectories = #directories - 1 end
+
+	for k,v in pairs(directories) do
+		if v == "/" then
+			continue end
+
+		if isRoot then
+			directoriesDone = directoriesDone + 1 end
+		resourceBrowser.setStatusProgress(directoriesDone / totalDirectories)
+
+		if containsInvalidCharacters(v) then continue end
+
+
+		local node = node:AddNode(v)
+
+		if SysTime() - timeResumed > 0.07 then
+			coroutine.yield()
+		end
+		populateTree(path != "" and path .. "/" .. v or v, node)
+	end
+end
+
+function resourceBrowser.refreshDirectoryTree()
+	local dt = resourceBrowser.directoryTree
+
+	totalDirectories = 0
+	directoriesDone = 0
+
+	if dt.RootNode.ChildNodes then
+		dt.RootNode.ChildNodes:Remove()
+		dt.RootNode.ChildNodes = nil
+		dt.RootNode:SetNeedsPopulating(false)
+		dt.RootNode:InvalidateLayout()
+		dt.RootNode.Expander:SetExpanded(false)
+	end
+	
+	resourceBrowser.setStatus("populating directory tree")
+	resourceBrowser.setStatusProgress(0)
+
+	resourceBrowser.onDirectoryListRefreshStart()
+	local c = coroutine.create(function() populateTree("", dt, true) end)
+	hook.Add("Think", "resourcebrowser populateTree Think", function()
+		timeResumed = SysTime()
+		if(!coroutine.resume(c)) then
+			hook.Remove("Think", "resourcebrowser populateTree Think")
+			resourceBrowser.onDirectoryListRefreshComplete()
+			resourceBrowser.setStatus()
+		end
+	end)
 end
 
 function resourceBrowser.browsePath(path, node)
@@ -270,57 +350,9 @@ function resourceBrowser.browsePath(path, node)
 	end
 end
 
-
-local timeResumed = 0
-local totalDirectories = 0
-local directoriesDone = 0
-
-local function populateTree(path, node, isRoot)
-	local searchPath = path .. "/*"
-	if path == "" then
-		searchPath = "*" end
-
-	local files, directories = file.Find(searchPath, "GAME", "namedesc")
-	if isRoot then
-		totalDirectories = #directories - 1 end
-
-	for k,v in pairs(directories) do
-		if v == "/" then
-			continue end
-
-		if isRoot then
-			directoriesDone = directoriesDone + 1 end
-		resourceBrowser.setStatusProgress(directoriesDone / totalDirectories)
-
-		if containsInvalidCharacters(v) then continue end
-				
-
-		local node = node:AddNode(v)
-
-		if SysTime() - timeResumed > 0.07 then
-			coroutine.yield()
-		end
-		populateTree(path != "" and path .. "/" .. v or v, node)
-	end
-end
-
 function resourceBrowser.open()
 	if !resourceBrowser.initialized then
-		// Populate the tree view
-		local dt = resourceBrowser.directoryTree
-
-		resourceBrowser.setStatus("populating directory tree")
-		resourceBrowser.setStatusProgress(0)
-
-		local c = coroutine.create(function() populateTree("", dt, true) end)
-		hook.Add("Think", "resourcebrowser populateTree Think", function()
-			timeResumed = SysTime()
-			if(!coroutine.resume(c)) then
-				hook.Remove("Think", "resourcebrowser populateTree Think")
-				resourceBrowser.setStatus()
-			end
-		end)
-
+		resourceBrowser.refreshDirectoryTree()
 		resourceBrowser.initialized = true
 	end
 
@@ -331,6 +363,22 @@ end
 function resourceBrowser.close()
 	resourceBrowser.frame:Hide(false)
 end
+
+/*
+	Events
+*/
+
+function resourceBrowser.onDirectoryListRefreshComplete()
+	resourceBrowser.refreshButton:SetDisabled(false)
+end
+
+function resourceBrowser.onDirectoryListRefreshStart()
+	resourceBrowser.refreshButton:SetDisabled(true)
+end
+
+/*
+	ConCommands
+*/
 
 concommand.Add("rb_reload_modules", function()
 	loadModules()

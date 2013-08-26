@@ -85,7 +85,6 @@ function initBrowser()
 	refreshPanel:Dock(RIGHT)
 	refreshPanel:SetDrawBackground(false)
 	refreshPanel:DockPadding(4,4,4,4)
-	print(refreshPanel:GetTall())
 
 	local refreshButton = vgui.Create("DImageButton", refreshPanel)
 	refreshButton:SetSize(16,16)
@@ -129,7 +128,8 @@ function initBrowser()
 	// Directory tree
 	local directoryTree = vgui.Create("DTree", leftPanel)
 	directoryTree:Dock(FILL)
-	directoryTree.OnNodeSelected = function(self, node)
+	directoryTree.OnNodeSelected = function(tree, node)
+		if tree.ignoreNextSelectEvent then tree.ignoreNextSelectEvent = nil return end
 		local path = getPathFromNode(node)
 		resourceBrowser.browsePath(path, node)
 	end
@@ -147,8 +147,9 @@ function initBrowser()
 		cmenu:AddSpacer()
 		cmenu:AddOption("Refresh", function() resourceBrowser.refreshFiles() end)
 		cmenu:AddSpacer()
-		cmenu:AddOption("Copy path", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), false) end)
-		cmenu:AddOption("Copy trimmed", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), true) end)
+		local copySub = cmenu:AddSubMenu("Copy path", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), false) end)
+		copySub:AddOption("Trimmed path", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), true) end)
+		copySub:AddOption("Trimmed path with extension", function() resourceBrowser.copyPathToClipboard(resourceBrowser.path .. "/" .. line:GetColumnText(1), true, true) end)
 		cmenu:AddSpacer()
 		cmenu:AddOption("Delete", function() resourceBrowser.deleteFile(resourceBrowser.path .. "/" .. line:GetColumnText(1)) end)
 
@@ -203,7 +204,7 @@ function resourceBrowser.openFile(filePath)
 
 	for k,v in pairs(resourceBrowser.modules) do
 		if table.HasValue(v.fileTypes, fileType) then
-			local handled = v:SpawnUI(filePath)
+			local handled = v:SpawnUI(string.GetFileFromFilename(filePath), filePath)
 
 			if handled then
 				break
@@ -229,12 +230,9 @@ function resourceBrowser.deleteFile(filePath)
 	end, "No")
 end
 
-function resourceBrowser.copyPathToClipboard(filePath, trim)
+function resourceBrowser.copyPathToClipboard(filePath, trim, keepExtension)
 	if trim then
-		local rootStart, rootEnd = string.find(filePath, "^[^/]+/")
-		filePath = string.sub(filePath, rootEnd + 1, string.len(filePath))
-		local extStart, extEnd = string.find(test, "([^%.]+)$")
-		filePath = string.sub(filePath, 1, extStart - 2)
+		filePath = resourceBrowser.trimPath(filePath, keepExtension)
 	end
 
 	SetClipboardText(filePath)
@@ -242,6 +240,19 @@ end
 
 function resourceBrowser.refreshFiles()
 	error("Not implemented")
+end
+
+function resourceBrowser.trimPath(path, keepExtension)
+	-- TODO: Less lazy, more proper plz
+	local rootStart, rootEnd = string.find(path, "^[^/]+/")
+	path = string.sub(path, rootEnd + 1, string.len(path))
+
+	if !keepExtension then
+		local ext = "." .. string.GetExtensionFromFilename(path)
+		path = string.Replace(path, ext, "")
+	end
+
+	return path
 end
 
 local timeResumed = 0
@@ -269,6 +280,7 @@ local function populateTree(path, node, isRoot)
 
 
 		local node = node:AddNode(v)
+		node.name = v
 
 		if SysTime() - timeResumed > 0.07 then
 			coroutine.yield()
@@ -307,9 +319,9 @@ function resourceBrowser.refreshDirectoryTree()
 end
 
 function resourceBrowser.browsePath(path, node)
-	print(path)
 	if !file.Exists(path, "GAME") or !file.IsDir(path, "GAME") then
 		// Revert to root path if the directory doesn't exist or path leads to a file
+		print("Path does not exist or isn't a directory!")
 		path = ""
 	end
 	resourceBrowser.path = path
@@ -332,6 +344,9 @@ function resourceBrowser.browsePath(path, node)
 			end
 		end
 
+		print(node, prevNode)
+
+		dt.ignoreNextSelectEvent = true
 		dt:SetSelectedItem(node)
 		if prevNode != nil then
 			prevNode:ExpandTo(true) end
@@ -341,11 +356,16 @@ function resourceBrowser.browsePath(path, node)
 	local fl = resourceBrowser.fileList
 	fl:Clear()
 
-	local files, directories = file.Find(path .. "/*", "GAME")
+	local searchPath = path == "" and "*" or path .. "/*"
+	local files, directories = file.Find(searchPath, "GAME")
+	print(searchPath, #files)
 	for k,v in pairs(files) do
-		if !file.Exists(path .. "/".. v, "GAME") then continue end
+		local filePath = path == "" and v or path .. "/" .. v
 
-		local fileSize = file.Size(path .. "/" .. v, "GAME")
+		if !file.Exists(filePath, "GAME") then continue end
+		if v == "/" then continue end
+
+		local fileSize = file.Size(filePath, "GAME")
 		fl:AddLine(v, string.GetExtensionFromFilename(v), string.NiceSize(fileSize), "")
 	end
 end

@@ -58,6 +58,8 @@ local function getPathFromNode(node)
 end
 
 function initBrowser()
+	if(resourceBrowser.frame) then return end
+
 	// Create the base interface
 	local frame = vgui.Create("DFrame")
 	frame:SetTitle("Resource Browser 2")
@@ -405,7 +407,10 @@ concommand.Add("rb_reload_modules", function()
 end)
 
 concommand.Add("rb_open", function()
+	initBrowser()
 	resourceBrowser.open()
 end)
 
-initBrowser()
+hook.Add("Initialized", "Resource Browser Initialized", function()
+	initBrowser()
+end)

@@ -1,6 +1,6 @@
 local MODULE = {}
 MODULE.name			= "Sound Player"
-MODULE.author		= "Deruu"
+MODULE.author		= "Aptann"
 MODULE.fileTypes = { "wav", "mp3" }
 
 function MODULE:SpawnUI(fileName, filePath)

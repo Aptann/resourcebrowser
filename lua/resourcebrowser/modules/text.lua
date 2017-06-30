@@ -1,6 +1,6 @@
 local MODULE = {}
 MODULE.name			= "Text Viewer"
-MODULE.author		= "Deruu"
+MODULE.author		= "Aptann"
 MODULE.fileTypes = { "txt" }
 
 function MODULE:SpawnUI(fileName, filePath)

@@ -1,6 +1,6 @@
 local MODULE = {}
 MODULE.name			= "Material Viewer"
-MODULE.author		= "Deruu"
+MODULE.author		= "Aptann"
 MODULE.fileTypes = { "vtf", "vmt" }
 
 function MODULE:SpawnUI(fileName, filePath)

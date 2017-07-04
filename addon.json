@@ -1,0 +1,13 @@
+{
+    "title": "Resource Browser 2",
+    "type": "tool",
+    "tags": [],
+    "ignore": [
+        ".git/*",
+        ".gitignore",
+        "README.md",
+        "LICENSE",
+        "resourcebrowser.jpeg",
+        "resourcebrowser.gma"
+    ]
+}

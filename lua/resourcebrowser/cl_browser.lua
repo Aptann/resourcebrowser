@@ -16,7 +16,7 @@ local function loadModules()
 	Msg("Loading Resource Browser modules...\n")
 
 	resourceBrowser.modules = {}
-	local files, directories = file.Find("addons/resourcebrowser/lua/resourcebrowser/modules/*", "GAME")
+	local files, directories = file.Find("lua/resourcebrowser/modules/*", "GAME")
 	for k,v in pairs(files) do
 		include("resourcebrowser/modules/" .. v)
 	end
